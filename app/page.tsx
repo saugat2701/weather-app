@@ -21,6 +21,24 @@ export default function Home() {
   const favRef = useRef<any>(null);
 
   useEffect(() => {
+    // Initial fetch based on user location
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          search(undefined, { lat: latitude, lon: longitude });
+        },
+        () => {
+          // Fallback if permission denied or error
+          search("London");
+        }
+      );
+    } else {
+      search("London");
+    }
+  }, []);
+
+  useEffect(() => {
     if (city.length < 2) { setSuggestions([]); return; }
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -31,9 +49,9 @@ export default function Home() {
     }, 300);
   }, [city]);
 
-  const search = async (cityName?: string) => {
+  const search = async (cityName?: string, coords?: { lat: number, lon: number }) => {
     const searchCity = cityName || city;
-    if (!searchCity.trim()) return;
+    if (!searchCity.trim() && !coords) return;
     setShowSuggestions(false);
     setLoading(true);
     setError("");
@@ -41,9 +59,10 @@ export default function Home() {
     setForecast(null);
     setAqi(null);
     try {
+      const body = coords ? JSON.stringify(coords) : JSON.stringify({ city: searchCity });
       const [weatherRes, forecastRes] = await Promise.all([
-        fetch("/api/weather", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ city: searchCity }) }),
-        fetch(`/api/forecast?city=${encodeURIComponent(searchCity)}`),
+        fetch("/api/weather", { method: "POST", headers: { "Content-Type": "application/json" }, body }),
+        fetch(coords ? `/api/forecast?lat=${coords.lat}&lon=${coords.lon}` : `/api/forecast?city=${encodeURIComponent(searchCity)}`),
       ]);
       const weatherData = await weatherRes.json();
       const forecastData = await forecastRes.json();
@@ -121,14 +140,15 @@ export default function Home() {
                   onChange={e => { setCity(e.target.value); setShowSuggestions(true); }}
                   onKeyDown={e => e.key === "Enter" && search()}
                   onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                  placeholder="Search any city..."
+                  placeholder="Enter city to be searched..."
                   className={`w-full rounded-2xl pl-12 pr-5 py-4 outline-none transition-all text-sm ${darkMode ? "bg-white/10 border border-white/10 text-white placeholder-white/30 focus:border-sky-400/50" : "bg-white border border-slate-200 text-slate-700 placeholder-slate-300 focus:border-sky-400 shadow-sm"}`}
                 />
               </div>
               <button onClick={handleVoiceSearch}
                 className={`px-4 rounded-2xl transition-all ${listening ? "bg-red-500 text-white" : darkMode ? "bg-white/10 text-white/60 hover:bg-white/20" : "bg-white border border-slate-200 text-slate-500 shadow-sm"}`}>
-                🎤
+                🎙️
               </button>
+
               <button onClick={() => search()} disabled={loading}
                 className="px-6 py-4 rounded-2xl font-bold text-white text-sm disabled:opacity-50 transition-all"
                 style={{ background: "linear-gradient(135deg, #38bdf8, #818cf8)" }}>

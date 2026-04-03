@@ -4,9 +4,12 @@ import { fetchWeatherData } from "@/lib/weather";
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 export async function POST(req: NextRequest) {
   try {
-    const { city } = await req.json();
-    if (!city) return NextResponse.json({ error: "City name is required" }, { status: 400 });
-    const weather = await fetchWeatherData(city);
+    const { city, lat, lon } = await req.json();
+    if (!city && (lat === undefined || lon === undefined)) {
+      return NextResponse.json({ error: "City name or coordinates are required" }, { status: 400 });
+    }
+    const query = city || { lat, lon };
+    const weather = await fetchWeatherData(query);
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       max_tokens: 300,
